@@ -2,7 +2,7 @@
 
 # KanDo
 
-Your tasks, on a Kanban board, on your own server. KanDo combines a minimal interface with an MCP server so AI clients can manage your tasks.
+A fresh task board for every day, organized by priority, on your own server. KanDo combines a focused daily to-do list with an MCP server so AI clients can plan and manage your tasks.
 
 **Self-hosted · SQLite · Light and dark mode · MCP · Docker**
 
@@ -10,16 +10,31 @@ KanDo is an early version for a personal workspace. User accounts, teams, and re
 
 ## Features
 
-- Four columns: Backlog, To do, In progress, and Done
-- Tasks with descriptions, priorities, and optional due dates
-- Drag-and-drop and status selectors for keyboard and mobile use
-- Search task titles and descriptions; filter by priority
+- A separate board for each day, with High, Medium, and Low priority columns
+- Unfinished tasks carry forward to today automatically; completed tasks stay on their planned day
+- Completion checkboxes, daily progress, and an option to hide completed tasks
+- Previous/next day navigation, future planning, and an All tasks view
+- Drag-and-drop or a priority selector to move tasks between columns
+- A planned day for each task, plus a separate optional deadline and description
+- Search task titles and descriptions
 - Light and dark themes, following your system by default
 - English by default, with German available from the language selector
 - Persistent language and theme preferences in your browser
 - MCP access for AI clients over Streamable HTTP and stdio
 
 The language selector updates the interface, dialogs, dates, accessibility labels, and errors immediately. Existing task titles and descriptions stay as written. English is the default even if your browser uses German; German is enabled only when you select it. API messages and MCP tool descriptions use English.
+
+## Daily workflow
+
+Open KanDo to see today's board. Add tasks directly to a priority column, then check them off as you finish. Drag a task between columns to change its priority, or use its priority selector. The **Planned for** field determines the daily board; the optional **Due date** is a separate deadline.
+
+Use the date picker or previous/next buttons to plan another day. **All tasks** shows tasks across all dates with their planned days, including older completed work. Search and the completed-task toggle apply to the selected view.
+
+When a new day begins, unfinished tasks from earlier days move to today, retaining their priority, description, and deadline. Completed tasks and future tasks keep their planned date. Reopening a completed task from a past day brings it to today. If KanDo was stopped for several days, unfinished tasks move straight to the current day on the next access. No duplicate tasks or daily reset jobs are created.
+
+Rollover happens on the server when tasks are read or updated through the app, REST API, or MCP. An open, visible board refreshes every minute and on focus; refreshes pause while a task dialog is open to preserve drafts. Set `TZ` to your timezone (for example `Europe/Berlin`). Docker defaults to `Etc/UTC`; direct Node.js runs use the system timezone unless `TZ` is set. The browser follows the server's current day.
+
+Existing databases are upgraded automatically without deleting tasks. On the first upgrade, tasks are assigned to their existing due date or, if no due date exists, today. Unfinished past tasks then carry forward normally. Existing status values remain compatible with MCP clients, but board columns now represent priority.
 
 ## Run locally
 
@@ -46,7 +61,7 @@ The app has one shared personal workspace without user authentication. The local
 
 ## Connect an MCP client
 
-The MCP server uses the [official TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server). Both transports access the same SQLite database as the board. Changes made by other clients appear when you select **Refresh**, refocus the browser window, or reload the page. Refreshing does not interrupt an open editing dialog.
+The MCP server uses the [official TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server). Both transports access the same SQLite database as the board. Changes made by other clients appear on the next minute refresh while the board is visible, when you select **Refresh**, refocus the browser window, or reload the page. Refreshing does not interrupt an open editing dialog.
 
 ### Streamable HTTP
 
@@ -122,14 +137,29 @@ Run manually with `node mcp-stdio.js` or `npm run --silent mcp`. stdout is reser
 
 | Tool | Purpose |
 | --- | --- |
-| `list_tasks` | List tasks; optional `query`, `status`, and `priority` filters |
+| `list_tasks` | List tasks; optional `day` (`today` or `YYYY-MM-DD`), `priority`, `status`, and `query` filters |
 | `get_task` | Read a task by `id` |
-| `create_task` | Create a task; requires `title` |
+| `create_task` | Create a task on today’s board; requires `title`; use `scheduledFor` for another day |
 | `update_task` | Update only the fields provided |
-| `move_task` | Move a task by `id` to a `status` |
+| `move_task` | Change a task’s `priority`, `scheduledFor`, and/or `status` by `id` |
 | `delete_task` | Permanently delete a task by `id` |
 
-Status values: `backlog`, `todo`, `doing`, `done`. Priorities: `low`, `medium`, `high`. New tasks default to `todo` and `medium`. Optional fields: `description` and `dueDate` in `YYYY-MM-DD` format; an empty date removes the due date. Failures are returned as MCP tool errors. Read-only and destructive tools are annotated accordingly.
+Priorities: `high`, `medium`, `low`. New tasks default to today in the server timezone, `medium` priority, and `todo` status. Set `scheduledFor` (`YYYY-MM-DD`) to plan another day. `description` and `dueDate` are optional; an empty `dueDate` removes the deadline. An unfinished task assigned to a past day is carried forward to today.
+
+Set `status: "done"` to complete a task and `status: "todo"` to reopen it. The older `backlog` and `doing` status values remain supported and count as unfinished. Failures are returned as MCP tool errors. Read-only and destructive tools are annotated accordingly.
+
+Examples of MCP tool arguments:
+
+```json
+[
+  {"name":"list_tasks","arguments":{"day":"today","priority":"high"}},
+  {"name":"create_task","arguments":{"title":"Send the invoice","priority":"high"}},
+  {"name":"move_task","arguments":{"id":"<task-id>","priority":"low"}},
+  {"name":"update_task","arguments":{"id":"<task-id>","status":"done"}}
+]
+```
+
+To plan a future task, also provide `scheduledFor`, for example `"2027-01-15"`.
 
 ## Configuration
 
@@ -137,6 +167,7 @@ Status values: `backlog`, `todo`, `doing`, `done`. Priorities: `low`, `medium`, 
 | --- | --- | --- |
 | `HOST` | `127.0.0.1` | HTTP bind address (`0.0.0.0` inside Docker) |
 | `PORT` | `3000` | HTTP port |
+| `TZ` | System timezone; `Etc/UTC` in Compose | Timezone for daily rollover |
 | `DATABASE_PATH` | `data/kando.sqlite` in the project | SQLite database path |
 | `MCP_TOKEN` | empty | Bearer token for `/mcp`; required with a public URL |
 | `MCP_PUBLIC_URL` | empty | Public HTTPS MCP address, including `/mcp` |
@@ -159,7 +190,7 @@ Run tests:
 npm test
 ```
 
-Tests use temporary databases and cover REST CRUD, validation, persistence across restarts, HTTP and stdio MCP clients, shared data access, MCP access controls, tunnel forwarding, public URL configuration, theme preferences, and language selection. Language tests cover English defaults, German persistence, interface translation, date formatting, errors, and preserving task content and drafts. The tunnel tests simulate the HTTP hop after TLS termination. Tests do not verify a live public tunnel, browser layout, or a running Docker container.
+Tests use temporary databases and cover daily rollover, completed-task history, migration from existing databases, date planning, priority changes, completion, REST CRUD, validation, persistence across restarts, HTTP and stdio MCP clients, shared data access, MCP access controls, tunnel forwarding, public URL configuration, theme preferences, and language selection. Language tests cover English defaults, German persistence, interface translation, date formatting, errors, and preserving task content and drafts. The tunnel tests simulate the HTTP hop after TLS termination. Tests do not verify a live public tunnel, browser layout, or a running Docker container.
 
 Frontend: HTML, CSS, and JavaScript. Backend: Node.js HTTP server and `node:sqlite`. MCP: `@modelcontextprotocol/sdk` with Zod schemas. DOM tests use jsdom as a development dependency.
 

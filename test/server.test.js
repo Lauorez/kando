@@ -11,7 +11,9 @@ test('task lifecycle, validation, isolation and persistence', async () => {
   try {
     server = await start(join(dir, 'tasks.sqlite'));
     const request = (path = '/api/tasks', method = 'GET', body, headers = {}) => fetch(server.url + path, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
-    assert.deepEqual(await (await request()).json(), []);
+    const initial = await request();
+    assert.match(initial.headers.get('X-KanDo-Today'), /^\d{4}-\d{2}-\d{2}$/);
+    assert.deepEqual(await initial.json(), []);
     const page = await request('/');
     assert.equal(page.status, 200);
     const html = await page.text();
@@ -21,6 +23,7 @@ test('task lifecycle, validation, isolation and persistence', async () => {
     assert.equal((await request('/style.css')).status, 200);
     assert.equal((await request('/app.js')).status, 200);
     assert.equal((await request('/i18n.js')).status, 200);
+    assert.equal((await request('/dates.js')).status, 200);
     const invalidTitle = await (await request('/api/tasks', 'POST', { title: '' })).json();
     assert.equal(invalidTitle.code, 'TITLE_INVALID');
     assert.match(invalidTitle.error, /title must contain/);

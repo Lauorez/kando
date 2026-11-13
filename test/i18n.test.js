@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { createI18n, messages, translatePage } from '../public/i18n.js';
+import { localDay } from '../public/dates.js';
 
 function storage(initial) {
   const values = new Map(initial ? [['kando-language', initial]] : []);
@@ -41,13 +42,13 @@ test('static UI translations include labels and metadata without changing form v
   }
   i18n.setLanguage('de'); translatePage(doc, i18n);
   assert.equal(doc.documentElement.lang, 'de');
-  assert.equal(doc.title, 'Mein Board · KanDo');
+  assert.equal(doc.title, 'Tagesaufgaben · KanDo');
   assert.equal(doc.querySelector('#search').placeholder, 'Aufgaben suchen …');
   assert.equal(doc.querySelector('#close-dialog').getAttribute('aria-label'), 'Schließen');
   assert.equal(title.value, 'Meine unveränderte Aufgabe');
   assert.equal(doc.querySelector('[name="status"]').value, 'doing');
   i18n.setLanguage('en'); translatePage(doc, i18n);
-  assert.equal(doc.title, 'My board · KanDo');
+  assert.equal(doc.title, 'Daily tasks · KanDo');
   assert.equal(title.value, 'Meine unveränderte Aufgabe');
   dom.window.close();
 });
@@ -60,7 +61,7 @@ test('live language switching preserves tasks, search, drafts, and localized ser
   Object.defineProperty(window.navigator, 'language', { value: 'de-DE' });
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  const task = { id: '62f829ab-c457-4798-a402-cfc064d63354', title: 'Meine Aufgabe <script>', description: 'Unverändert', status: 'todo', priority: 'high', dueDate: '2026-03-10' };
+  const task = { id: '62f829ab-c457-4798-a402-cfc064d63354', title: 'Meine Aufgabe <script>', description: 'Unverändert', status: 'todo', priority: 'high', dueDate: '2026-03-10', scheduledFor: localDay() };
   const change = (element, type = 'change') => element.dispatchEvent(new window.Event(type, { bubbles: true }));
   globalThis.window = window;
   globalThis.document = doc;
@@ -72,7 +73,7 @@ test('live language switching preserves tasks, search, drafts, and localized ser
     assert.equal(doc.querySelector('.card-title').textContent, task.title);
     assert.equal(doc.querySelector('.card-title script'), null);
     assert.equal(doc.querySelector('.badge').textContent, 'High');
-    assert.equal(doc.querySelector('.due').textContent, 'Mar 10');
+    assert.equal(doc.querySelector('.due').textContent, 'Due date: Mar 10');
     doc.querySelector('.task-card').click();
     const title = doc.querySelector('[name="title"]');
     title.value = 'Unsaved draft';
@@ -83,7 +84,7 @@ test('live language switching preserves tasks, search, drafts, and localized ser
     assert.equal(doc.querySelector('#save-task').textContent, 'Änderungen speichern');
     assert.equal(title.value, 'Unsaved draft');
     assert.equal(doc.querySelector('.badge').textContent, 'Hoch');
-    assert.equal(doc.querySelector('.due').textContent, '10. März');
+    assert.equal(doc.querySelector('.due').textContent, 'Fällig am: 10. März');
     assert.equal(window.localStorage.getItem('kando-language'), 'de');
     change(doc.querySelector('#task-form'), 'submit');
     await new Promise(setImmediate);

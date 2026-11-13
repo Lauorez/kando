@@ -1,12 +1,16 @@
 import { createI18n, messages, translatePage } from './i18n.js';
+import { isDay, localDay, shiftDay } from './dates.js';
 
 const $ = (selector) => document.querySelector(selector);
 let storage;
 try { storage = window.localStorage; } catch {}
 const i18n = createI18n(storage);
 const t = (key, values) => i18n.t(key, values);
-const columns = ['backlog', 'todo', 'doing', 'done'];
+const priorities = ['high', 'medium', 'low'];
 let tasks = [];
+let today = localDay();
+let selectedDay = today;
+let view = 'daily';
 let editingId = null;
 let draggingId = null;
 let busy = false;
@@ -43,36 +47,56 @@ async function api(path = '', options = {}) {
   let data;
   try { data = await response.json(); } catch { throw uiError('errors.save'); }
   if (!response.ok) throw uiError(Object.hasOwn(messages.en, `errors.${data.code}`) ? `errors.${data.code}` : 'errors.save');
+  const serverDay = response.headers.get('X-KanDo-Today');
+  if (isDay(serverDay)) {
+    if (selectedDay === today) selectedDay = serverDay;
+    today = serverDay;
+  }
   return data;
 }
-function localToday() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+function formatDay(day, options = { day: 'numeric', month: 'short' }) {
+  return new Intl.DateTimeFormat(i18n.locale, options).format(new Date(`${day}T12:00:00`));
 }
 function card(task) {
-  const due = task.dueDate ? new Intl.DateTimeFormat(i18n.locale, { day: 'numeric', month: 'short' }).format(new Date(`${task.dueDate}T12:00:00`)) : t('noDate');
-  const overdue = task.dueDate && task.dueDate < localToday() && task.status !== 'done';
-  return `<article class="task-card" draggable="true" data-id="${task.id}" tabindex="0" aria-label="${escape(t('openTask', { title: task.title }))}"><div class="card-top"><span class="badge ${task.priority}">${t(task.priority)}</span><button class="edit-task" aria-label="${escape(t('editTask', { title: task.title }))}">···</button></div><h3 class="card-title">${escape(task.title)}</h3>${task.description ? `<p class="card-description">${escape(task.description)}</p>` : ''}<div class="card-bottom"><span class="due ${overdue ? 'overdue' : ''}" title="${task.dueDate || t('noDate')}">${task.dueDate ? due : ''}</span><select class="status-select" aria-label="${escape(t('taskStatus', { title: task.title }))}" ${busy ? 'disabled' : ''}>${columns.map((column) => `<option value="${column}" ${column === task.status ? 'selected' : ''}>${t(column)}</option>`).join('')}</select></div></article>`;
+  const complete = task.status === 'done';
+  const overdue = task.dueDate && task.dueDate < today && !complete;
+  return `<article class="task-card ${complete ? 'is-done' : ''}" draggable="true" data-id="${task.id}" tabindex="0" aria-label="${escape(t('openTask', { title: task.title }))}">
+    <div class="card-top"><span class="badge ${task.priority}">${t(task.priority)}</span><button class="edit-task" aria-label="${escape(t('editTask', { title: task.title }))}">···</button></div>
+    <div class="task-heading"><input type="checkbox" class="complete-task" ${complete ? 'checked' : ''} ${busy ? 'disabled' : ''} aria-label="${escape(t(complete ? 'reopenTask' : 'completeTask', { title: task.title }))}"><h3 class="card-title">${escape(task.title)}</h3></div>
+    ${task.description ? `<p class="card-description">${escape(task.description)}</p>` : ''}
+    ${view === 'all' ? `<p class="planned-day">${escape(t('taskDay', { day: formatDay(task.scheduledFor, { year: 'numeric', month: 'short', day: 'numeric' }) }))}</p>` : ''}
+    <div class="card-bottom"><span class="due ${overdue ? 'overdue' : ''}" title="${task.dueDate || t('noDate')}">${task.dueDate ? `${t('dueDate')}: ${formatDay(task.dueDate)}` : ''}</span><select class="priority-select" aria-label="${escape(t('taskPriority', { title: task.title }))}" ${busy ? 'disabled' : ''}>${priorities.map((priority) => `<option value="${priority}" ${priority === task.priority ? 'selected' : ''}>${t(priority)}</option>`).join('')}</select></div>
+  </article>`;
 }
 function render() {
   const query = $('#search').value.trim().toLocaleLowerCase(i18n.locale);
-  const priority = $('#priority-filter').value;
-  const visible = tasks.filter((t) => `${t.title} ${t.description}`.toLocaleLowerCase(i18n.locale).includes(query) && (priority === 'all' || t.priority === priority));
-  const done = tasks.filter((t) => t.status === 'done').length;
-  $('#summary').textContent = t(tasks.length === 1 ? 'summaryOne' : 'summary', { count: tasks.length, done });
-  $('#board').innerHTML = columns.map((column) => {
-    const items = visible.filter((t) => t.status === column);
-    return `<section class="column" data-status="${column}" aria-label="${t(column)}"><div class="column-heading"><h2>${t(column)}</h2><span class="column-count">${items.length}</span><button class="icon-button add-task" aria-label="${escape(t('addIn', { column: t(column) }))}">+</button></div><div class="cards">${items.length ? items.map(card).join('') : `<div class="empty-column">${!loaded ? t('loading') : query || priority !== 'all' ? t('noMatches') : t('empty')}</div>`}</div><button class="add-card add-task">${t('addTask')}</button></section>`;
+  const dayTasks = tasks.filter((task) => view === 'all' || task.scheduledFor === selectedDay);
+  const visible = dayTasks.filter((task) => `${task.title} ${task.description}`.toLocaleLowerCase(i18n.locale).includes(query) && ($('#show-completed').checked || task.status !== 'done'));
+  const done = dayTasks.filter((task) => task.status === 'done').length;
+  $('#summary').textContent = loaded ? t(dayTasks.length === 1 ? 'summaryOne' : 'summary', { count: dayTasks.length, done }) : t('loading');
+  $('#board-title').textContent = t(view === 'all' ? 'allTasks' : selectedDay === today ? 'today' : 'dailyBoard');
+  $('#board-date').textContent = view === 'all' ? '' : formatDay(selectedDay, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  document.title = `${$('#board-title').textContent} · KanDo`;
+  $('#selected-day').value = selectedDay;
+  $('#day-navigation').hidden = view === 'all';
+  $('#daily-view').setAttribute('aria-pressed', String(view === 'daily'));
+  $('#all-view').setAttribute('aria-pressed', String(view === 'all'));
+  $('#daily-progress').max = dayTasks.length || 1;
+  $('#daily-progress').value = done;
+  $('#board').innerHTML = priorities.map((priority) => {
+    const items = visible.filter((task) => task.priority === priority).sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+    return `<section class="column" data-priority="${priority}" aria-label="${t(priority)}"><div class="column-heading"><h2>${t(priority)}</h2><span class="column-count">${items.length}</span><button class="icon-button add-task" aria-label="${escape(t('addIn', { column: t(priority) }))}">+</button></div><div class="cards">${items.length ? items.map(card).join('') : `<div class="empty-column">${!loaded ? t('loading') : query ? t('noMatches') : t('empty')}</div>`}</div><button class="add-card add-task">${t('addTask')}</button></section>`;
   }).join('');
 }
-function openTask(id = null, status = 'todo') {
+function openTask(id = null, priority = 'medium') {
   if (busy || $('#refresh').disabled) return;
   if (!loaded) { error('errors.notLoaded'); return; }
   editingId = id;
-  const task = tasks.find((t) => t.id === id);
+  const task = tasks.find((task) => task.id === id);
   form.reset();
   error('', $('#form-error'));
-  for (const [name, value] of Object.entries(task || { status, priority: 'medium' })) if (form.elements.namedItem(name)) form.elements.namedItem(name).value = value;
+  const defaults = { status: 'todo', priority, scheduledFor: view === 'all' || selectedDay < today ? today : selectedDay };
+  for (const [name, value] of Object.entries(task || defaults)) if (form.elements.namedItem(name)) form.elements.namedItem(name).value = value;
   dialogLabels();
   form.elements.title.setCustomValidity('');
   $('#delete-task').hidden = !task;
@@ -81,38 +105,47 @@ function openTask(id = null, status = 'todo') {
 }
 function lock(value) {
   busy = value;
-  for (const el of form.elements) el.disabled = value;
+  for (const element of form.elements) element.disabled = value;
   $('#confirm-delete').disabled = value;
   $('#cancel-delete').disabled = value;
 }
-async function move(id, status) {
-  const existing = tasks.find((task) => task.id === id);
-  if (busy || $('#refresh').disabled || !existing || existing.status === status) return;
+async function updateTask(id, patch) {
+  if (busy || $('#refresh').disabled) { render(); return; }
   lock(true);
   error('');
   localized($('#save-state'), 'saving');
+  render();
   try {
-    const updated = await api(`/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
-    tasks = tasks.map((t) => t.id === id ? updated : t);
+    const updated = await api(`/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+    tasks = tasks.map((task) => task.id === id ? updated : task);
     localized($('#save-state'), 'saved');
   } catch (e) { error(e); localized($('#save-state'), 'notSaved'); }
   finally { lock(false); render(); }
 }
-$('#language').addEventListener('change', (event) => {
-  i18n.setLanguage(event.target.value);
-  applyLanguage();
-});
+function selectDay(day) {
+  if (!isDay(day)) { $('#selected-day').value = selectedDay; return; }
+  selectedDay = day;
+  view = 'daily';
+  render();
+}
+$('#language').addEventListener('change', (event) => { i18n.setLanguage(event.target.value); applyLanguage(); });
 form.elements.title.addEventListener('invalid', () => form.elements.title.setCustomValidity(t('errors.TITLE_INVALID')));
 form.elements.title.addEventListener('input', () => form.elements.title.setCustomValidity(''));
 $('#new-task').addEventListener('click', () => openTask());
 $('#search').addEventListener('input', render);
-$('#priority-filter').addEventListener('change', render);
+$('#show-completed').addEventListener('change', render);
+$('#selected-day').addEventListener('change', (event) => selectDay(event.target.value));
+$('#previous-day').addEventListener('click', () => selectDay(shiftDay(selectedDay, -1)));
+$('#next-day').addEventListener('click', () => selectDay(shiftDay(selectedDay, 1)));
+$('#today').addEventListener('click', () => selectDay(today));
+$('#daily-view').addEventListener('click', () => { view = 'daily'; render(); });
+$('#all-view').addEventListener('click', () => { view = 'all'; render(); });
 for (const id of ['close-dialog', 'cancel-dialog']) $(`#${id}`).addEventListener('click', () => dialog.close());
 for (const modal of [dialog, $('#delete-dialog')]) modal.addEventListener('cancel', (event) => { if (busy) event.preventDefault(); });
 $('#board').addEventListener('click', (event) => {
-  if (event.target.closest('select')) return;
+  if (event.target.closest('select,input')) return;
   const add = event.target.closest('.add-task');
-  if (add) return openTask(null, add.closest('.column').dataset.status);
+  if (add) return openTask(null, add.closest('.column').dataset.priority);
   const task = event.target.closest('.task-card');
   if (task) openTask(task.dataset.id);
 });
@@ -120,11 +153,14 @@ $('#board').addEventListener('keydown', (event) => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('.task-card')) { event.preventDefault(); openTask(event.target.dataset.id); }
 });
 $('#board').addEventListener('change', (event) => {
-  if (event.target.matches('.status-select')) move(event.target.closest('.task-card').dataset.id, event.target.value);
+  const card = event.target.closest('.task-card');
+  if (!card) return;
+  if (event.target.matches('.priority-select')) updateTask(card.dataset.id, { priority: event.target.value });
+  if (event.target.matches('.complete-task')) updateTask(card.dataset.id, { status: event.target.checked ? 'done' : 'todo' });
 });
 $('#board').addEventListener('dragstart', (event) => {
   const task = event.target.closest('.task-card');
-  if (!task || busy || $('#refresh').disabled || event.target.closest('select')) return event.preventDefault();
+  if (!task || busy || $('#refresh').disabled || event.target.closest('select,input,button')) return event.preventDefault();
   draggingId = task.dataset.id;
   event.dataTransfer.setData('text/plain', draggingId);
   event.dataTransfer.effectAllowed = 'move';
@@ -138,11 +174,17 @@ $('#board').addEventListener('dragleave', (event) => {
   const column = event.target.closest('.column');
   if (column && !column.contains(event.relatedTarget)) column.classList.remove('drag-over');
 });
-function clearDrag() { draggingId = null; document.querySelectorAll('.drag-over,.dragging').forEach((el) => el.classList.remove('drag-over', 'dragging')); }
+function clearDrag() { draggingId = null; document.querySelectorAll('.drag-over,.dragging').forEach((element) => element.classList.remove('drag-over', 'dragging')); }
 $('#board').addEventListener('dragend', clearDrag);
 $('#board').addEventListener('drop', (event) => {
   const column = event.target.closest('.column');
-  if (column && draggingId) { event.preventDefault(); const id = draggingId; clearDrag(); move(id, column.dataset.status); }
+  if (column && draggingId) {
+    event.preventDefault();
+    const id = draggingId;
+    const priority = column.dataset.priority;
+    clearDrag();
+    if (tasks.find((task) => task.id === id)?.priority !== priority) updateTask(id, { priority });
+  }
 });
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -152,12 +194,12 @@ form.addEventListener('submit', async (event) => {
   error('', $('#form-error'));
   try {
     const task = await api(editingId ? `/${editingId}` : '', { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify(input) });
-    tasks = editingId ? tasks.map((t) => t.id === editingId ? task : t) : [task, ...tasks];
+    tasks = editingId ? tasks.map((existing) => existing.id === editingId ? task : existing) : [task, ...tasks];
+    if (view === 'daily') selectedDay = task.scheduledFor;
     loaded = true;
     error('');
     localized($('#save-state'), 'saved');
     dialog.close();
-    render();
   } catch (e) { error(e, $('#form-error')); }
   finally { lock(false); render(); }
 });
@@ -168,8 +210,8 @@ $('#confirm-delete').addEventListener('click', async () => {
   lock(true);
   try {
     await api(`/${editingId}`, { method: 'DELETE' });
-    tasks = tasks.filter((t) => t.id !== editingId);
-    $('#delete-dialog').close(); dialog.close(); render();
+    tasks = tasks.filter((task) => task.id !== editingId);
+    $('#delete-dialog').close(); dialog.close();
     localized($('#save-state'), 'deleted');
   } catch (e) { error(e, $('#delete-error')); }
   finally { lock(false); render(); }
@@ -187,5 +229,7 @@ async function refresh() {
 }
 $('#refresh').addEventListener('click', refresh);
 window.addEventListener('focus', refresh);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+window.setInterval(() => { if (!document.hidden) refresh(); }, 60_000);
 applyLanguage();
 await refresh();

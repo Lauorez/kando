@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#141a18">
-  <meta name="description" content="KanDo – your self-hosted Kanban board." data-i18n-content="metaDescription">
-  <title data-i18n="pageTitle">My board · KanDo</title>
+  <meta name="description" content="KanDo – your self-hosted daily task board." data-i18n-content="metaDescription">
+  <title data-i18n="pageTitle">Daily tasks · KanDo</title>
   <link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/style.css">
   <script src="/theme.js"></script><script type="module" src="/app.js"></script>
 </head>
@@ -17,12 +17,23 @@
     </div>
   </header>
   <main>
-    <section class="page-heading"><div><h1 data-i18n="boardTitle">My board</h1><p id="summary" aria-live="polite">Loading tasks …</p></div><button class="primary" id="new-task" data-i18n="newTask">+ New task</button></section>
+    <section class="page-heading">
+      <div><p class="board-date" id="board-date"></p><h1 id="board-title">Today</h1><p id="summary" aria-live="polite">Loading tasks …</p></div>
+      <button class="primary" id="new-task" data-i18n="newTask">+ New task</button>
+    </section>
     <section class="board-tools" aria-label="Board tools" data-i18n-aria-label="tools">
+      <div class="view-switch"><button id="daily-view" aria-pressed="true" data-i18n="dailyBoard">Daily board</button><button id="all-view" aria-pressed="false" data-i18n="allTasks">All tasks</button></div>
+      <div class="day-navigation" id="day-navigation">
+        <button class="secondary" id="previous-day" aria-label="Previous day" data-i18n-aria-label="previousDay">‹</button>
+        <input id="selected-day" type="date" min="0001-01-01" max="9999-12-31" aria-label="Board date" data-i18n-aria-label="selectedDay">
+        <button class="secondary" id="next-day" aria-label="Next day" data-i18n-aria-label="nextDay">›</button>
+        <button class="secondary" id="today" data-i18n="today">Today</button>
+      </div>
       <input id="search" type="search" placeholder="Search tasks …" aria-label="Search tasks" data-i18n-placeholder="search" data-i18n-aria-label="searchLabel">
-      <select id="priority-filter" aria-label="Filter by priority" data-i18n-aria-label="filter"><option value="all" data-i18n="allPriorities">All priorities</option><option value="high" data-i18n="high">High</option><option value="medium" data-i18n="medium">Medium</option><option value="low" data-i18n="low">Low</option></select>
       <button class="secondary" id="refresh" data-i18n="refresh">Refresh</button>
     </section>
+    <div class="daily-overview"><p data-i18n="dailyHint">Unfinished tasks carry forward to today.</p><label class="completed-filter"><input id="show-completed" type="checkbox" checked><span data-i18n="showCompleted">Show completed</span></label></div>
+    <progress id="daily-progress" value="0" max="1" aria-label="Daily progress" data-i18n-aria-label="progress"></progress>
     <div id="error" class="error" role="alert" hidden></div>
     <section class="board" id="board" aria-label="Kanban board" data-i18n-aria-label="board" aria-busy="true"></section>
     <footer class="board-footer"><span id="save-state" role="status" data-i18n="loading">Loading board …</span></footer>
@@ -32,8 +43,9 @@
       <div class="dialog-heading"><h2 id="dialog-title" data-i18n="createHeading">New task</h2><button type="button" class="icon-button" id="close-dialog" aria-label="Close" data-i18n-aria-label="close">×</button></div>
       <label><span data-i18n="title">Title</span><input name="title" required maxlength="160" placeholder="What would you like to do?" data-i18n-placeholder="titlePlaceholder"></label>
       <label><span data-i18n="description">Description</span><span class="optional" data-i18n="optional">optional</span><textarea name="description" maxlength="10000" rows="4" placeholder="Details, notes, or next steps …" data-i18n-placeholder="descriptionPlaceholder"></textarea></label>
+      <input name="status" type="hidden" value="todo">
       <div class="form-grid">
-        <label><span data-i18n="status">Status</span><select name="status"><option value="backlog" data-i18n="backlog">Backlog</option><option value="todo" data-i18n="todo">To do</option><option value="doing" data-i18n="doing">In progress</option><option value="done" data-i18n="done">Done</option></select></label>
+        <label><span data-i18n="scheduledFor">Planned for</span><input name="scheduledFor" type="date" required min="0001-01-01" max="9999-12-31"></label>
         <label><span data-i18n="priority">Priority</span><select name="priority"><option value="low" data-i18n="low">Low</option><option value="medium" selected data-i18n="medium">Medium</option><option value="high" data-i18n="high">High</option></select></label>
       </div>
       <label><span data-i18n="dueDate">Due date</span><span class="optional" data-i18n="optional">optional</span><input name="dueDate" type="date" min="0001-01-01" max="9999-12-31"></label>
