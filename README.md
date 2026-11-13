@@ -1,23 +1,27 @@
-<img src="assets/icon.svg" width="56" height="56" alt="KanDo Logo">
+<img src="assets/icon.svg" width="56" height="56" alt="KanDo logo">
 
 # KanDo
 
-Deine Aufgaben als Kanban-Board – auf deinem eigenen Server. KanDo verbindet eine reduzierte, deutschsprachige Oberfläche mit einem MCP-Server, über den KI-Clients Aufgaben verwalten können.
+Your tasks, on a Kanban board, on your own server. KanDo combines a minimal interface with an MCP server so AI clients can manage your tasks.
 
-**Self-hosted · SQLite · Hell- und Darkmode · MCP · Docker**
+**Self-hosted · SQLite · Light and dark mode · MCP · Docker**
 
-KanDo ist eine frühe Version für einen persönlichen Workspace. Es gibt noch keine Benutzerkonten, Teams oder Echtzeit-Synchronisierung. Die Anwendung benötigt Node.js 24 oder neuer bzw. Docker mit Compose; ein Frontend-Build ist nicht nötig.
+KanDo is an early version for a personal workspace. User accounts, teams, and real-time synchronization are not available yet. It requires Node.js 24 or later, or Docker with Compose. No frontend build is needed.
 
-## Funktionen
+## Features
 
-- Vier Spalten: Ideenspeicher, Zu erledigen, In Arbeit und Erledigt
-- Aufgaben mit Beschreibung, Priorität und optionalem Fälligkeitsdatum
-- Drag-and-drop und Statusauswahl für Tastatur und Mobilgeräte
-- Suche über Titel und Beschreibung, Prioritätsfilter
-- Helle und dunkle Darstellung; standardmäßig Systemeinstellung, manuelle Auswahl wird im Browser gespeichert
-- MCP für KI-Clients über Streamable HTTP und stdio
+- Four columns: Backlog, To do, In progress, and Done
+- Tasks with descriptions, priorities, and optional due dates
+- Drag-and-drop and status selectors for keyboard and mobile use
+- Search task titles and descriptions; filter by priority
+- Light and dark themes, following your system by default
+- English by default, with German available from the language selector
+- Persistent language and theme preferences in your browser
+- MCP access for AI clients over Streamable HTTP and stdio
 
-## Lokal starten
+The language selector updates the interface, dialogs, dates, accessibility labels, and errors immediately. Existing task titles and descriptions stay as written. English is the default even if your browser uses German; German is enabled only when you select it. API messages and MCP tool descriptions use English.
+
+## Run locally
 
 ```sh
 git clone https://github.com/Lauorez/kando.git
@@ -26,140 +30,139 @@ npm ci
 npm start
 ```
 
-Unter http://localhost:3000 öffnen. `npm start` und `npm run dev` laden eine vorhandene `.env` im Projektverzeichnis; bestehende Umgebungsvariablen haben Vorrang. `npm run dev` startet mit automatischem Server-Neustart.
+Open http://localhost:3000. Both `npm start` and `npm run dev` load an existing `.env` file from the project directory; environment variables take precedence. `npm run dev` restarts the server when its files change.
 
 ## Docker
 
-Im geklonten Projektverzeichnis:
+From the cloned project directory:
 
 ```sh
 docker compose up -d --build
 ```
 
-Unter http://localhost:3000 öffnen. Die Daten bleiben im Volume `kando-data` bei Neustarts, Updates und `docker compose down` erhalten. `docker compose down -v` löscht sie.
+Open http://localhost:3000. Data persists in the `kando-data` volume through restarts, updates, and `docker compose down`. Running `docker compose down -v` deletes that data.
 
-Die App verwendet einen gemeinsamen persönlichen Workspace ohne Benutzeranmeldung. Der Port ist lokal und in Compose standardmäßig nur an Loopback gebunden. Für entfernten Zugriff einen eigenen Reverse Proxy mit HTTPS und Authentifizierung oder ein privates VPN verwenden. `MCP_TOKEN` schützt nur den MCP-Endpunkt; für die Weboberfläche und REST-API bleibt die vorgeschaltete Authentifizierung nötig.
+The app has one shared personal workspace without user authentication. The local server and Compose port binding use loopback by default. For remote access to the board, use your own reverse proxy with HTTPS and authentication, or a private VPN. `MCP_TOKEN` protects only the MCP endpoint; the web interface and REST API still need authentication at the proxy.
 
-## MCP anschließen
+## Connect an MCP client
 
-Der MCP-Server verwendet das [offizielle TypeScript-SDK](https://ts.sdk.modelcontextprotocol.io/server). Beide Zugänge verwenden dieselbe SQLite-Datenbank wie das Board. Änderungen anderer Clients werden über **Aktualisieren**, beim erneuten Fokussieren des Browserfensters oder beim Neuladen sichtbar. Offene Bearbeitungsdialoge bleiben dabei erhalten.
+The MCP server uses the [official TypeScript SDK](https://ts.sdk.modelcontextprotocol.io/server). Both transports access the same SQLite database as the board. Changes made by other clients appear when you select **Refresh**, refocus the browser window, or reload the page. Refreshing does not interrupt an open editing dialog.
 
 ### Streamable HTTP
 
-Der HTTP-MCP läuft mit der App unter:
+The MCP endpoint runs alongside the app at:
 
 ```text
 http://localhost:3000/mcp
 ```
 
-Diese URL in einem MCP-Client mit Streamable-HTTP-Unterstützung hinterlegen. Der Endpunkt arbeitet zustandslos über POST; ein dauerhafter SSE-Kanal und Sitzungs-IDs werden nicht benötigt.
+Add this URL to a client that supports Streamable HTTP. The endpoint is stateless and uses POST; it does not require a persistent SSE channel or session IDs.
 
-Optional den Endpunkt mit einem eigenen langen, zufälligen Token schützen:
+Optionally protect local MCP access with a long, random token:
 
 ```sh
-MCP_TOKEN='dein-langes-zufaelliges-token' npm start
+MCP_TOKEN='your-long-random-token' npm start
 ```
 
-Im Client den Header `Authorization: Bearer dein-langes-zufaelliges-token` setzen. Das ist ein statischer Bearer-Token, kein OAuth-Anmeldeflow. Für Docker die Variablen über eine lokale `.env` setzen; siehe `.env.example`.
+Configure the client header `Authorization: Bearer your-long-random-token`. This is a static bearer token, not an OAuth login flow. For Docker, set variables in a local `.env` file; see [`.env.example`](.env.example).
 
-Zusätzliche interne Hostnamen lassen sich über `MCP_ALLOWED_HOSTS` erlauben (ohne Schema oder Port). Für einen Tunnel bzw. Reverse Proxy mit öffentlicher HTTPS-Adresse die folgende Konfiguration verwenden. Fremde Browser-Origins werden abgewiesen. Ohne `MCP_TOKEN` ist der lokale Endpunkt für jeden erreichbar, der den lokalen Port erreichen kann.
+Use `MCP_ALLOWED_HOSTS` for additional internal hostnames, without a scheme or port. For a public HTTPS address, follow the tunnel configuration below. Requests from other browser origins are rejected. Without `MCP_TOKEN`, anyone able to reach the local port can access the local MCP endpoint.
 
-### Tunnel und Reverse Proxy
+### Tunnels and reverse proxies
 
-`MCP_PUBLIC_URL` enthält die vollständige öffentliche MCP-Adresse. Der Hostname wird automatisch zur Host-Freigabe hinzugefügt. KanDo akzeptiert damit sowohl den ursprünglichen öffentlichen Host-Header als auch einen auf einen freigegebenen lokalen Host umgeschriebenen Header. Die öffentliche HTTPS-Origin wird ebenfalls berücksichtigt. `Forwarded` und `X-Forwarded-*` werden dafür nicht vertraut; ein pauschales Freigeben aller Hosts ist nicht nötig.
+Set `MCP_PUBLIC_URL` to the full public MCP address. Its hostname is automatically added to the allowed hosts. KanDo accepts both the original public Host header and a Host header rewritten to an allowed internal hostname. The public HTTPS origin is accepted too. KanDo does not trust `Forwarded` or `X-Forwarded-*` for these checks; a wildcard host rule is not needed.
 
-1. `.env.example` nach `.env` kopieren und setzen:
+1. Copy `.env.example` to `.env` and configure:
 
    ```dotenv
    MCP_PUBLIC_URL=https://kando.example.org/mcp
-   MCP_TOKEN=hier-einen-eigenen-langen-zufaelligen-token-eintragen
+   MCP_TOKEN=replace-with-your-own-long-random-token
    MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1]
    ```
 
-   Einen Token kannst du lokal mit `openssl rand -hex 32` erzeugen. Bei gesetzter öffentlicher URL ist ein Token erforderlich; KanDo prüft die Konfiguration vor dem Start. Die URL muss HTTPS verwenden und den Pfad `/mcp` enthalten, ohne Query, Fragment oder Zugangsdaten. Bei einer wechselnden Tunnel-Adresse die URL anpassen und KanDo neu starten.
+   Generate a token locally with `openssl rand -hex 32`. A token is required when the public URL is set; KanDo validates the configuration before starting. The URL must use HTTPS and the path `/mcp`, without credentials, a query, or a fragment. If your tunnel URL changes, update it and restart KanDo.
 
-2. KanDo mit `npm start` oder `docker compose up -d --build` starten. Der Tunnel leitet **nur `/mcp`** auf `http://127.0.0.1:3000/mcp` weiter. HTTPS endet am Tunnel; die Verbindung vom lokalen Tunnel-Prozess zu KanDo verwendet HTTP. `HOST=0.0.0.0` ist nicht erforderlich, wenn der Tunnel auf demselben Rechner läuft.
+2. Start KanDo with `npm start` or `docker compose up -d --build`. Forward **only `/mcp`** to `http://127.0.0.1:3000/mcp`. HTTPS terminates at the tunnel; the local hop to KanDo uses HTTP. `HOST=0.0.0.0` is not needed when the tunnel runs on the same machine.
 
-3. Im MCP-Client **Streamable HTTP**, URL `https://kando.example.org/mcp` und Header `Authorization: Bearer <dein-token>` eintragen. Der Tunnel muss den Authorization-Header unverändert weiterreichen. KanDo verwendet weiterhin einen statischen Bearer-Token und bietet keinen OAuth-Login.
+3. In your MCP client, select **Streamable HTTP**, use `https://kando.example.org/mcp`, and set `Authorization: Bearer <your-token>`. The tunnel must preserve the Authorization header. KanDo uses a static bearer token and does not provide OAuth login.
 
-Für einen vorhandenen, lokal verwalteten Cloudflare-Tunnel liegt eine Vorlage unter [`examples/cloudflared.yml`](examples/cloudflared.yml). UUID, Zugangsdatenpfad und Domain durch eigene Werte ersetzen; der Tunnel und dessen DNS-Zuordnung müssen bereits eingerichtet sein. Danach beispielsweise:
+A template for an existing, locally managed Cloudflare Tunnel is available in [`examples/cloudflared.yml`](examples/cloudflared.yml). Replace the UUID, credentials path, and hostname. The tunnel and its DNS mapping must already exist. Then, for example:
 
 ```sh
-cloudflared tunnel --config /absoluter/pfad/cloudflared.yml ingress validate
-cloudflared tunnel --config /absoluter/pfad/cloudflared.yml run
+cloudflared tunnel --config /absolute/path/cloudflared.yml ingress validate
+cloudflared tunnel --config /absolute/path/cloudflared.yml run
 ```
 
-Die Vorlage routet ausschließlich `/mcp`; andere Pfade liefern 404. Damit werden Board und REST-API nicht versehentlich über diesen Tunnel veröffentlicht. Aufbau und Pfadregeln entsprechen der [Cloudflare-Dokumentation](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/configuration-file/).
+The template routes only `/mcp`; other paths return 404. This keeps the board and REST API out of that tunnel. The configuration and path rules follow the [Cloudflare documentation](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/configuration-file/).
 
-Bei anderen Tunneln oder einem Reverse Proxy dieselbe Pfadbeschränkung konfigurieren. Liefert der Proxy intern etwa `Host: kando:3000`, zusätzlich `kando` in `MCP_ALLOWED_HOSTS` aufnehmen. Läuft der Tunnel in einem eigenen Container, ist `127.0.0.1` dessen eigener Container: dort als Ziel den KanDo-Service im gemeinsamen Docker-Netz verwenden. Die mitgelieferte Vorlage ist für einen Tunnel-Prozess auf dem Host gedacht.
+For another tunnel provider or reverse proxy, apply the same path restriction. If the proxy sends an internal header such as `Host: kando:3000`, add `kando` to `MCP_ALLOWED_HOSTS`. A tunnel running in its own container must target the KanDo service in a shared Docker network; `127.0.0.1` would refer to the tunnel container itself. The included template assumes the tunnel process runs on the host.
 
-KanDo betreibt den MCP-Endpunkt; den Tunnel betreibst du mit deinem eigenen Anbieter. Die Anwendung startet keinen Tunnel automatisch.
+KanDo provides the MCP endpoint. You operate the tunnel with your chosen provider; the app does not start a tunnel automatically.
 
-### Lokaler stdio-Zugang
+### Local stdio access
 
-Nach `npm ci` können Clients den MCP als lokalen Prozess starten. Den Beispielpfad durch den absoluten Pfad des geklonten Projekts ersetzen:
+After `npm ci`, clients can launch the MCP server as a local process. Replace the example path with the absolute path of your clone:
 
 ```json
 {
   "mcpServers": {
     "kando": {
       "command": "node",
-      "args": ["/absoluter/pfad/zu/kando/mcp-stdio.js"]
+      "args": ["/absolute/path/to/kando/mcp-stdio.js"]
     }
   }
 }
 ```
 
-Die Web-App muss dafür nicht laufen. Beide Prozesse können gleichzeitig auf dieselbe Datenbank zugreifen. Der Standard-Datenpfad liegt relativ zum Projekt, unabhängig vom Arbeitsverzeichnis des Clients. Für andere Datenpfade `DATABASE_PATH` im MCP-Client unter `env` setzen. Bei einer Docker-Installation bevorzugt den HTTP-Zugang verwenden, damit das Docker-Volume verwendet wird.
+The web app does not need to be running. Both processes can access the same database concurrently. The default database path is relative to the project, regardless of the client's working directory. To use another database, set `DATABASE_PATH` in the MCP client's `env` configuration. For Docker installations, prefer HTTP access to use the container's data volume.
 
-Manuell starten: `node mcp-stdio.js` oder `npm run --silent mcp`. stdout ist ausschließlich für MCP-Nachrichten reserviert.
+Run manually with `node mcp-stdio.js` or `npm run --silent mcp`. stdout is reserved for MCP messages.
 
 ### Tools
 
-| Tool | Funktion |
+| Tool | Purpose |
 | --- | --- |
-| `list_tasks` | Aufgaben lesen; optional `query`, `status` und `priority` |
-| `get_task` | Aufgabe mit `id` abrufen |
-| `create_task` | Aufgabe erstellen; `title` erforderlich |
-| `update_task` | Nur angegebene Felder einer Aufgabe ändern |
-| `move_task` | Aufgabe mit `id` in einen `status` verschieben |
-| `delete_task` | Aufgabe mit `id` dauerhaft löschen |
+| `list_tasks` | List tasks; optional `query`, `status`, and `priority` filters |
+| `get_task` | Read a task by `id` |
+| `create_task` | Create a task; requires `title` |
+| `update_task` | Update only the fields provided |
+| `move_task` | Move a task by `id` to a `status` |
+| `delete_task` | Permanently delete a task by `id` |
 
-Statuswerte: `backlog`, `todo`, `doing`, `done`. Prioritäten: `low`, `medium`, `high`. Neue Aufgaben erhalten standardmäßig `todo` und `medium`. Optional: `description` und `dueDate` im Format `YYYY-MM-DD`; ein leerer Datumswert entfernt das Fälligkeitsdatum. Fehler werden als MCP-Tool-Fehler zurückgegeben. Lesende und löschende Tools sind entsprechend annotiert.
+Status values: `backlog`, `todo`, `doing`, `done`. Priorities: `low`, `medium`, `high`. New tasks default to `todo` and `medium`. Optional fields: `description` and `dueDate` in `YYYY-MM-DD` format; an empty date removes the due date. Failures are returned as MCP tool errors. Read-only and destructive tools are annotated accordingly.
 
-## Konfiguration
+## Configuration
 
-| Variable | Standard | Bedeutung |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `HOST` | `127.0.0.1` | HTTP-Bind-Adresse (im Container `0.0.0.0`) |
-| `PORT` | `3000` | HTTP-Port |
-| `DATABASE_PATH` | `data/kando.sqlite` im Projekt | Pfad zur SQLite-Datei |
-| `MCP_TOKEN` | leer | Bearer-Token für `/mcp`; bei öffentlicher URL erforderlich |
-| `MCP_PUBLIC_URL` | leer | Öffentliche HTTPS-MCP-Adresse eines Tunnels/Proxys, inklusive `/mcp` |
-| `MCP_ALLOWED_HOSTS` | `localhost,127.0.0.1,[::1]` | Erlaubte HTTP-MCP-Hostnamen |
+| `HOST` | `127.0.0.1` | HTTP bind address (`0.0.0.0` inside Docker) |
+| `PORT` | `3000` | HTTP port |
+| `DATABASE_PATH` | `data/kando.sqlite` in the project | SQLite database path |
+| `MCP_TOKEN` | empty | Bearer token for `/mcp`; required with a public URL |
+| `MCP_PUBLIC_URL` | empty | Public HTTPS MCP address, including `/mcp` |
+| `MCP_ALLOWED_HOSTS` | `localhost,127.0.0.1,[::1]` | Allowed HTTP MCP hostnames |
 
-## Sicherung
+## Backups
 
-Vor Updates die App und eventuell laufende stdio-Prozesse stoppen. Dann das gesamte Datenverzeichnis bzw. Docker-Volume kopieren; SQLite verwendet WAL. Danach wieder starten. Zum Wiederherstellen bei gestoppten Prozessen den gesicherten Datenordner zurückkopieren.
+Before updating, stop the app and any stdio processes. Copy the entire data directory or Docker volume; SQLite uses WAL. Restart the processes afterwards. To restore a backup, stop all processes and replace the data directory with the backup.
 
-## Entwicklung
+## Development
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Tests ausführen:
+Run tests:
 
 ```sh
 npm test
 ```
 
-Die Tests verwenden temporäre Datenbanken und prüfen REST-CRUD, Validierung, Speicherung über Neustarts, HTTP- und stdio-MCP mit echten SDK-Clients, gemeinsamen Datenzugriff, MCP-Zugriffsschutz, Tunnel-Weiterleitung und öffentliche URL-Konfiguration sowie Theme-Auswahl und Persistenz. Das Browserlayout und der Docker-Build sind damit nicht visuell bzw. zur Laufzeit geprüft.
+Tests use temporary databases and cover REST CRUD, validation, persistence across restarts, HTTP and stdio MCP clients, shared data access, MCP access controls, tunnel forwarding, public URL configuration, theme preferences, and language selection. Language tests cover English defaults, German persistence, interface translation, date formatting, errors, and preserving task content and drafts. The tunnel tests simulate the HTTP hop after TLS termination. Tests do not verify a live public tunnel, browser layout, or a running Docker container.
 
-Frontend: HTML, CSS und JavaScript. Backend: Node.js HTTP-Server und `node:sqlite`. MCP: `@modelcontextprotocol/sdk` mit Zod-Schemas.
-
+Frontend: HTML, CSS, and JavaScript. Backend: Node.js HTTP server and `node:sqlite`. MCP: `@modelcontextprotocol/sdk` with Zod schemas. DOM tests use jsdom as a development dependency.
 
 ## Feedback
 
-Fehler und Funktionswünsche können über [GitHub Issues](https://github.com/Lauorez/kando/issues) gemeldet werden. Für Fehlerberichte bitte Node.js-Version, Betriebsart (direkt oder Docker) und Schritte zum Reproduzieren angeben. Zugangsdaten und persönliche Aufgaben aus Logs entfernen.
+Report bugs and feature requests in [GitHub Issues](https://github.com/Lauorez/kando/issues). Include your Node.js version, deployment method (direct or Docker), and reproduction steps. Remove credentials and personal task data from logs before sharing them.

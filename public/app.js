@@ -1,11 +1,11 @@
+import { createI18n, messages, translatePage } from './i18n.js';
+
 const $ = (selector) => document.querySelector(selector);
-const columns = [
-  { id: 'backlog', title: 'Ideenspeicher', empty: 'Keine Aufgaben' },
-  { id: 'todo', title: 'Zu erledigen', empty: 'Keine Aufgaben' },
-  { id: 'doing', title: 'In Arbeit', empty: 'Keine Aufgaben' },
-  { id: 'done', title: 'Erledigt', empty: 'Keine Aufgaben' },
-];
-const priorities = { high: 'Hoch', medium: 'Mittel', low: 'Niedrig' };
+let storage;
+try { storage = window.localStorage; } catch {}
+const i18n = createI18n(storage);
+const t = (key, values) => i18n.t(key, values);
+const columns = ['backlog', 'todo', 'doing', 'done'];
 let tasks = [];
 let editingId = null;
 let draggingId = null;
@@ -14,13 +14,35 @@ let loaded = false;
 const form = $('#task-form');
 const dialog = $('#task-dialog');
 const escape = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-function error(message, target = $('#error')) { target.textContent = message; target.hidden = !message; }
+function localized(element, key) {
+  element.dataset.i18n = key;
+  element.textContent = t(key);
+}
+function error(value, target = $('#error')) {
+  const key = value?.messageKey || (typeof value === 'string' ? value : value ? 'errors.save' : '');
+  if (key) localized(target, key);
+  else { delete target.dataset.i18n; target.textContent = ''; }
+  target.hidden = !key;
+}
+function uiError(messageKey) { return Object.assign(new Error(t(messageKey)), { messageKey }); }
+function dialogLabels() {
+  localized($('#dialog-title'), editingId ? 'editHeading' : 'createHeading');
+  localized($('#save-task'), editingId ? 'save' : 'create');
+}
+function applyLanguage() {
+  translatePage(document, i18n);
+  $('#language').value = i18n.language;
+  dialogLabels();
+  if (form.elements.title.validity.customError) form.elements.title.setCustomValidity(t('errors.TITLE_INVALID'));
+  render();
+}
 async function api(path = '', options = {}) {
   let response;
   try { response = await fetch(`/api/tasks${path}`, { ...options, headers: { 'Content-Type': 'application/json' } }); }
-  catch { throw Error('Der Server ist nicht erreichbar. Bitte versuche es erneut.'); }
-  const data = await response.json();
-  if (!response.ok) throw Error(data.error || 'Die Änderung konnte nicht gespeichert werden.');
+  catch { throw uiError('errors.unavailable'); }
+  let data;
+  try { data = await response.json(); } catch { throw uiError('errors.save'); }
+  if (!response.ok) throw uiError(Object.hasOwn(messages.en, `errors.${data.code}`) ? `errors.${data.code}` : 'errors.save');
   return data;
 }
 function localToday() {
@@ -28,31 +50,31 @@ function localToday() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 function card(task) {
-  const due = task.dueDate ? new Intl.DateTimeFormat('de-DE', { day: 'numeric', month: 'short' }).format(new Date(`${task.dueDate}T12:00:00`)) : 'Kein Datum';
+  const due = task.dueDate ? new Intl.DateTimeFormat(i18n.locale, { day: 'numeric', month: 'short' }).format(new Date(`${task.dueDate}T12:00:00`)) : t('noDate');
   const overdue = task.dueDate && task.dueDate < localToday() && task.status !== 'done';
-  return `<article class="task-card" draggable="true" data-id="${task.id}" tabindex="0" aria-label="${escape(task.title)} – zum Bearbeiten öffnen"><div class="card-top"><span class="badge ${task.priority}">${priorities[task.priority]}</span><button class="edit-task" aria-label="${escape(task.title)} bearbeiten">···</button></div><h3 class="card-title">${escape(task.title)}</h3>${task.description ? `<p class="card-description">${escape(task.description)}</p>` : ''}<div class="card-bottom"><span class="due ${overdue ? 'overdue' : ''}" title="${task.dueDate || 'Kein Fälligkeitsdatum'}">${task.dueDate ? due : ''}</span><select class="status-select" aria-label="Status von ${escape(task.title)}" ${busy ? 'disabled' : ''}>${columns.map((column) => `<option value="${column.id}" ${column.id === task.status ? 'selected' : ''}>${column.title}</option>`).join('')}</select></div></article>`;
+  return `<article class="task-card" draggable="true" data-id="${task.id}" tabindex="0" aria-label="${escape(t('openTask', { title: task.title }))}"><div class="card-top"><span class="badge ${task.priority}">${t(task.priority)}</span><button class="edit-task" aria-label="${escape(t('editTask', { title: task.title }))}">···</button></div><h3 class="card-title">${escape(task.title)}</h3>${task.description ? `<p class="card-description">${escape(task.description)}</p>` : ''}<div class="card-bottom"><span class="due ${overdue ? 'overdue' : ''}" title="${task.dueDate || t('noDate')}">${task.dueDate ? due : ''}</span><select class="status-select" aria-label="${escape(t('taskStatus', { title: task.title }))}" ${busy ? 'disabled' : ''}>${columns.map((column) => `<option value="${column}" ${column === task.status ? 'selected' : ''}>${t(column)}</option>`).join('')}</select></div></article>`;
 }
 function render() {
-  const query = $('#search').value.trim().toLocaleLowerCase('de');
+  const query = $('#search').value.trim().toLocaleLowerCase(i18n.locale);
   const priority = $('#priority-filter').value;
-  const visible = tasks.filter((t) => `${t.title} ${t.description}`.toLocaleLowerCase('de').includes(query) && (priority === 'all' || t.priority === priority));
+  const visible = tasks.filter((t) => `${t.title} ${t.description}`.toLocaleLowerCase(i18n.locale).includes(query) && (priority === 'all' || t.priority === priority));
   const done = tasks.filter((t) => t.status === 'done').length;
-  $('#summary').textContent = `${tasks.length} Aufgaben · ${done} erledigt`;
+  $('#summary').textContent = t(tasks.length === 1 ? 'summaryOne' : 'summary', { count: tasks.length, done });
   $('#board').innerHTML = columns.map((column) => {
-    const items = visible.filter((t) => t.status === column.id);
-    return `<section class="column" data-status="${column.id}" aria-label="${column.title}"><div class="column-heading"><h2>${column.title}</h2><span class="column-count">${items.length}</span><button class="icon-button add-task" aria-label="Aufgabe in ${column.title} erstellen">+</button></div><div class="cards">${items.length ? items.map(card).join('') : `<div class="empty-column">${!loaded ? 'Board wird geladen …' : query || priority !== 'all' ? 'Keine passenden Aufgaben.' : column.empty}</div>`}</div><button class="add-card add-task">＋ Aufgabe hinzufügen</button></section>`;
+    const items = visible.filter((t) => t.status === column);
+    return `<section class="column" data-status="${column}" aria-label="${t(column)}"><div class="column-heading"><h2>${t(column)}</h2><span class="column-count">${items.length}</span><button class="icon-button add-task" aria-label="${escape(t('addIn', { column: t(column) }))}">+</button></div><div class="cards">${items.length ? items.map(card).join('') : `<div class="empty-column">${!loaded ? t('loading') : query || priority !== 'all' ? t('noMatches') : t('empty')}</div>`}</div><button class="add-card add-task">${t('addTask')}</button></section>`;
   }).join('');
 }
 function openTask(id = null, status = 'todo') {
   if (busy || $('#refresh').disabled) return;
-  if (!loaded) { error('Das Board ist noch nicht verfügbar. Bitte lade die Seite erneut.'); return; }
+  if (!loaded) { error('errors.notLoaded'); return; }
   editingId = id;
   const task = tasks.find((t) => t.id === id);
   form.reset();
   error('', $('#form-error'));
   for (const [name, value] of Object.entries(task || { status, priority: 'medium' })) if (form.elements.namedItem(name)) form.elements.namedItem(name).value = value;
-  $('#dialog-title').textContent = task ? 'Aufgabe bearbeiten' : 'Neue Aufgabe';
-  $('#save-task').textContent = task ? 'Änderungen speichern' : 'Aufgabe erstellen';
+  dialogLabels();
+  form.elements.title.setCustomValidity('');
   $('#delete-task').hidden = !task;
   dialog.showModal();
   form.elements.title.focus();
@@ -68,14 +90,20 @@ async function move(id, status) {
   if (busy || $('#refresh').disabled || !existing || existing.status === status) return;
   lock(true);
   error('');
-  $('#save-state').textContent = 'Wird gespeichert …';
+  localized($('#save-state'), 'saving');
   try {
     const updated = await api(`/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
     tasks = tasks.map((t) => t.id === id ? updated : t);
-    $('#save-state').textContent = 'Alle Änderungen gespeichert';
-  } catch (e) { error(e.message); $('#save-state').textContent = 'Änderung nicht gespeichert'; }
+    localized($('#save-state'), 'saved');
+  } catch (e) { error(e); localized($('#save-state'), 'notSaved'); }
   finally { lock(false); render(); }
 }
+$('#language').addEventListener('change', (event) => {
+  i18n.setLanguage(event.target.value);
+  applyLanguage();
+});
+form.elements.title.addEventListener('invalid', () => form.elements.title.setCustomValidity(t('errors.TITLE_INVALID')));
+form.elements.title.addEventListener('input', () => form.elements.title.setCustomValidity(''));
 $('#new-task').addEventListener('click', () => openTask());
 $('#search').addEventListener('input', render);
 $('#priority-filter').addEventListener('change', render);
@@ -127,10 +155,10 @@ form.addEventListener('submit', async (event) => {
     tasks = editingId ? tasks.map((t) => t.id === editingId ? task : t) : [task, ...tasks];
     loaded = true;
     error('');
-    $('#save-state').textContent = 'Alle Änderungen gespeichert';
+    localized($('#save-state'), 'saved');
     dialog.close();
     render();
-  } catch (e) { error(e.message, $('#form-error')); }
+  } catch (e) { error(e, $('#form-error')); }
   finally { lock(false); render(); }
 });
 $('#delete-task').addEventListener('click', () => { error('', $('#delete-error')); $('#delete-dialog').showModal(); $('#cancel-delete').focus(); });
@@ -142,8 +170,8 @@ $('#confirm-delete').addEventListener('click', async () => {
     await api(`/${editingId}`, { method: 'DELETE' });
     tasks = tasks.filter((t) => t.id !== editingId);
     $('#delete-dialog').close(); dialog.close(); render();
-    $('#save-state').textContent = 'Aufgabe gelöscht';
-  } catch (e) { error(e.message, $('#delete-error')); }
+    localized($('#save-state'), 'deleted');
+  } catch (e) { error(e, $('#delete-error')); }
   finally { lock(false); render(); }
 });
 async function refresh() {
@@ -153,11 +181,11 @@ async function refresh() {
   try {
     tasks = await api(); loaded = true;
     error('');
-    $('#save-state').textContent = 'Board aktuell';
-  } catch (e) { error(e.message); $('#save-state').textContent = 'Aktualisierung fehlgeschlagen'; }
+    localized($('#save-state'), 'current');
+  } catch (e) { error(e); localized($('#save-state'), 'refreshFailed'); }
   finally { $('#refresh').disabled = false; $('#board').setAttribute('aria-busy', 'false'); render(); }
 }
 $('#refresh').addEventListener('click', refresh);
 window.addEventListener('focus', refresh);
-render();
+applyLanguage();
 await refresh();

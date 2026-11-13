@@ -1,27 +1,46 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#141a18"><meta name="description" content="KanDo – dein selbst gehostetes Kanban-Board.">
-  <title>Mein Board · KanDo</title><link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/style.css"><script src="/theme.js"></script><script type="module" src="/app.js"></script>
+  <meta name="theme-color" content="#141a18">
+  <meta name="description" content="KanDo – your self-hosted Kanban board." data-i18n-content="metaDescription">
+  <title data-i18n="pageTitle">My board · KanDo</title>
+  <link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/style.css">
+  <script src="/theme.js"></script><script type="module" src="/app.js"></script>
 </head>
 <body>
   <header class="app-header">
-    <a class="brand" href="/" aria-label="KanDo Startseite"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>KanDo</a>
-    <label class="theme-control">Darstellung<select id="theme" aria-label="Darstellung"><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>
+    <a class="brand" href="/" aria-label="KanDo home" data-i18n-aria-label="home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>KanDo</a>
+    <div class="header-controls">
+      <label class="theme-control"><span data-i18n="language">Language</span><select id="language" aria-label="Language" data-i18n-aria-label="language"><option value="en" lang="en">English</option><option value="de" lang="de">Deutsch</option></select></label>
+      <label class="theme-control"><span data-i18n="appearance">Appearance</span><select id="theme" aria-label="Appearance" data-i18n-aria-label="appearance"><option value="system" data-i18n="system">System</option><option value="light" data-i18n="light">Light</option><option value="dark" data-i18n="dark">Dark</option></select></label>
+    </div>
   </header>
   <main>
-    <section class="page-heading"><div><h1>Mein Board</h1><p id="summary" aria-live="polite">Aufgaben werden geladen …</p></div><button class="primary" id="new-task">+ Neue Aufgabe</button></section>
-    <section class="board-tools" aria-label="Board-Werkzeuge">
-      <input id="search" type="search" placeholder="Aufgaben suchen …" aria-label="Aufgaben suchen">
-      <select id="priority-filter" aria-label="Nach Priorität filtern"><option value="all">Alle Prioritäten</option><option value="high">Hoch</option><option value="medium">Mittel</option><option value="low">Niedrig</option></select>
-      <button class="secondary" id="refresh">Aktualisieren</button>
+    <section class="page-heading"><div><h1 data-i18n="boardTitle">My board</h1><p id="summary" aria-live="polite">Loading tasks …</p></div><button class="primary" id="new-task" data-i18n="newTask">+ New task</button></section>
+    <section class="board-tools" aria-label="Board tools" data-i18n-aria-label="tools">
+      <input id="search" type="search" placeholder="Search tasks …" aria-label="Search tasks" data-i18n-placeholder="search" data-i18n-aria-label="searchLabel">
+      <select id="priority-filter" aria-label="Filter by priority" data-i18n-aria-label="filter"><option value="all" data-i18n="allPriorities">All priorities</option><option value="high" data-i18n="high">High</option><option value="medium" data-i18n="medium">Medium</option><option value="low" data-i18n="low">Low</option></select>
+      <button class="secondary" id="refresh" data-i18n="refresh">Refresh</button>
     </section>
     <div id="error" class="error" role="alert" hidden></div>
-    <section class="board" id="board" aria-label="Kanban-Board" aria-busy="true"></section>
-    <footer class="board-footer"><span id="save-state" role="status">Board wird geladen …</span></footer>
+    <section class="board" id="board" aria-label="Kanban board" data-i18n-aria-label="board" aria-busy="true"></section>
+    <footer class="board-footer"><span id="save-state" role="status" data-i18n="loading">Loading board …</span></footer>
   </main>
-  <dialog id="task-dialog"><form id="task-form"><div class="dialog-heading"><div><h2 id="dialog-title">Neue Aufgabe</h2></div><button type="button" class="icon-button" id="close-dialog" aria-label="Schließen">×</button></div><label>Titel<input name="title" required maxlength="160" placeholder="Was möchtest du schaffen?"></label><label>Beschreibung <span class="optional">optional</span><textarea name="description" maxlength="10000" rows="4" placeholder="Details, Gedanken oder nächste Schritte …"></textarea></label><div class="form-grid"><label>Status<select name="status"><option value="backlog">Ideenspeicher</option><option value="todo">Zu erledigen</option><option value="doing">In Arbeit</option><option value="done">Erledigt</option></select></label><label>Priorität<select name="priority"><option value="low">Niedrig</option><option value="medium" selected>Mittel</option><option value="high">Hoch</option></select></label></div><label>Fällig am <span class="optional">optional</span><input name="dueDate" type="date" min="0001-01-01" max="9999-12-31"></label><p id="form-error" class="error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="danger" id="delete-task" hidden>Löschen</button><div><button type="button" class="secondary" id="cancel-dialog">Abbrechen</button><button type="submit" class="primary" id="save-task">Aufgabe erstellen</button></div></div></form></dialog>
-  <dialog id="delete-dialog"><div class="dialog-heading"><h2>Aufgabe löschen?</h2></div><p>Diese Aufgabe wird dauerhaft entfernt.</p><p id="delete-error" class="error" role="alert" hidden></p><div class="confirm-actions"><button class="secondary" id="cancel-delete">Behalten</button><button class="primary destructive" id="confirm-delete">Aufgabe löschen</button></div></dialog>
+  <dialog id="task-dialog">
+    <form id="task-form">
+      <div class="dialog-heading"><h2 id="dialog-title" data-i18n="createHeading">New task</h2><button type="button" class="icon-button" id="close-dialog" aria-label="Close" data-i18n-aria-label="close">×</button></div>
+      <label><span data-i18n="title">Title</span><input name="title" required maxlength="160" placeholder="What would you like to do?" data-i18n-placeholder="titlePlaceholder"></label>
+      <label><span data-i18n="description">Description</span><span class="optional" data-i18n="optional">optional</span><textarea name="description" maxlength="10000" rows="4" placeholder="Details, notes, or next steps …" data-i18n-placeholder="descriptionPlaceholder"></textarea></label>
+      <div class="form-grid">
+        <label><span data-i18n="status">Status</span><select name="status"><option value="backlog" data-i18n="backlog">Backlog</option><option value="todo" data-i18n="todo">To do</option><option value="doing" data-i18n="doing">In progress</option><option value="done" data-i18n="done">Done</option></select></label>
+        <label><span data-i18n="priority">Priority</span><select name="priority"><option value="low" data-i18n="low">Low</option><option value="medium" selected data-i18n="medium">Medium</option><option value="high" data-i18n="high">High</option></select></label>
+      </div>
+      <label><span data-i18n="dueDate">Due date</span><span class="optional" data-i18n="optional">optional</span><input name="dueDate" type="date" min="0001-01-01" max="9999-12-31"></label>
+      <p id="form-error" class="error" role="alert" hidden></p>
+      <div class="dialog-actions"><button type="button" class="danger" id="delete-task" data-i18n="delete" hidden>Delete</button><div><button type="button" class="secondary" id="cancel-dialog" data-i18n="cancel">Cancel</button><button type="submit" class="primary" id="save-task" data-i18n="create">Create task</button></div></div>
+    </form>
+  </dialog>
+  <dialog id="delete-dialog"><div class="dialog-heading"><h2 data-i18n="deleteHeading">Delete task?</h2></div><p data-i18n="deleteDescription">This task will be permanently deleted.</p><p id="delete-error" class="error" role="alert" hidden></p><div class="confirm-actions"><button class="secondary" id="cancel-delete" data-i18n="keep">Keep task</button><button class="primary destructive" id="confirm-delete" data-i18n="confirmDelete">Delete task</button></div></dialog>
 </body>
 </html>

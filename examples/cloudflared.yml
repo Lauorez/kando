@@ -1,6 +1,6 @@
-# Beispiel für einen vorhandenen, lokal verwalteten Cloudflare-Tunnel.
-# UUID, Zugangsdatenpfad und Hostnamen durch eigene Werte ersetzen.
-# cloudflared läuft hier auf demselben Rechner wie KanDo (bzw. der Docker-Port).
+# Template for an existing, locally managed Cloudflare Tunnel.
+# Replace the UUID, credentials path, and hostname with your own values.
+# Run cloudflared on the same host as KanDo (or its published Docker port).
 tunnel: YOUR_TUNNEL_UUID
 credentials-file: /path/to/YOUR_TUNNEL_UUID.json
 

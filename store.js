@@ -17,7 +17,7 @@ export function createStore(dbPath) {
     list() { return db.prepare('SELECT * FROM tasks ORDER BY createdAt DESC, id').all(); },
     get(id) {
       const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(id);
-      if (!task) throw Object.assign(Error('Aufgabe nicht gefunden.'), { status: 404 });
+      if (!task) throw Object.assign(Error('Task not found.'), { status: 404, code: 'TASK_NOT_FOUND' });
       return task;
     },
     create(input) {
@@ -28,7 +28,7 @@ export function createStore(dbPath) {
     },
     update(id, input) {
       const existing = this.get(id);
-      if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('Ungültige Aufgabe.');
+      if (!input || typeof input !== 'object' || Array.isArray(input)) throw Object.assign(Error('Invalid task.'), { code: 'TASK_INVALID' });
       const task = { ...existing, ...validate({ ...existing, ...input }), updatedAt: new Date().toISOString() };
       db.prepare('UPDATE tasks SET title=?, description=?, status=?, priority=?, dueDate=?, updatedAt=? WHERE id=?').run(task.title, task.description, task.status, task.priority, task.dueDate, task.updatedAt, task.id);
       return task;
@@ -45,11 +45,11 @@ export function createStore(dbPath) {
 const statuses = ['backlog', 'todo', 'doing', 'done'];
 const priorities = ['low', 'medium', 'high'];
 function validate(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('Ungültige Aufgabe.');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw Object.assign(Error('Invalid task.'), { code: 'TASK_INVALID' });
   const { title, description = '', status = 'todo', priority = 'medium', dueDate = '' } = input;
-  if (typeof title !== 'string' || !title.trim() || title.trim().length > 160) throw Error('Der Titel muss zwischen 1 und 160 Zeichen lang sein.');
-  if (typeof description !== 'string' || description.length > 10000) throw Error('Die Beschreibung darf höchstens 10.000 Zeichen lang sein.');
-  if (!statuses.includes(status) || !priorities.includes(priority)) throw Error('Ungültiger Status oder ungültige Priorität.');
-  if (typeof dueDate !== 'string' || (dueDate && (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(dueDate).toISOString().slice(0, 10) !== dueDate))) throw Error('Ungültiges Datum.');
+  if (typeof title !== 'string' || !title.trim() || title.trim().length > 160) throw Object.assign(Error('The title must contain between 1 and 160 characters.'), { code: 'TITLE_INVALID' });
+  if (typeof description !== 'string' || description.length > 10000) throw Object.assign(Error('The description must not exceed 10,000 characters.'), { code: 'DESCRIPTION_INVALID' });
+  if (!statuses.includes(status) || !priorities.includes(priority)) throw Object.assign(Error('Invalid status or priority.'), { code: 'STATUS_INVALID' });
+  if (typeof dueDate !== 'string' || (dueDate && (!/^\d{4}-\d{2}-\d{2}$/.test(dueDate) || !Number.isFinite(Date.parse(dueDate)) || new Date(dueDate).toISOString().slice(0, 10) !== dueDate))) throw Object.assign(Error('Invalid date.'), { code: 'DATE_INVALID' });
   return { title: title.trim(), description: description.trim(), status, priority, dueDate };
 }

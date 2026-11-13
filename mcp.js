@@ -11,9 +11,9 @@ const fields = {
   description: z.string().max(10000).optional(),
   status: status.optional(),
   priority: priority.optional(),
-  dueDate: z.string().describe('YYYY-MM-DD oder leer, um das Datum zu entfernen.').optional(),
+  dueDate: z.string().describe('YYYY-MM-DD, or an empty string to remove the due date.').optional(),
 };
-const id = z.string().uuid().describe('ID der Aufgabe.');
+const id = z.string().uuid().describe('Task ID.');
 const readOnly = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const write = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 export function createMcpServer(store) {
@@ -23,18 +23,18 @@ export function createMcpServer(store) {
       const result = await run(input);
       return { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result };
     } catch (error) {
-      const message = error.code?.startsWith('ERR_SQLITE') ? 'Datenbankfehler.' : error.message;
+      const message = error.code?.startsWith('ERR_SQLITE') ? 'Database error.' : error.message;
       return { isError: true, content: [{ type: 'text', text: message }] };
     }
   });
-  tool('list_tasks', 'Aufgaben lesen, nach Titel/Beschreibung suchen und nach Status oder Priorität filtern.', { query: z.string().optional(), status: status.optional(), priority: priority.optional() }, readOnly, (input) => ({
-    tasks: store.list().filter((task) => (!input.status || task.status === input.status) && (!input.priority || task.priority === input.priority) && (!input.query || `${task.title} ${task.description}`.toLocaleLowerCase('de').includes(input.query.toLocaleLowerCase('de')))),
+  tool('list_tasks', 'List tasks, search their titles and descriptions, and filter by status or priority.', { query: z.string().optional(), status: status.optional(), priority: priority.optional() }, readOnly, (input) => ({
+    tasks: store.list().filter((task) => (!input.status || task.status === input.status) && (!input.priority || task.priority === input.priority) && (!input.query || `${task.title} ${task.description}`.toLowerCase().includes(input.query.toLowerCase()))),
   }));
-  tool('get_task', 'Eine Aufgabe anhand ihrer ID lesen.', { id }, readOnly, ({ id }) => ({ task: store.get(id) }));
-  tool('create_task', 'Neue Aufgabe erstellen. Standard: todo, Priorität medium.', fields, write, (input) => ({ task: store.create(input) }));
-  tool('update_task', 'Felder einer Aufgabe ändern. Nicht angegebene Felder bleiben erhalten.', { id, ...fields, title: fields.title.optional() }, { ...write, idempotentHint: true }, ({ id, ...input }) => ({ task: store.update(id, input) }));
-  tool('move_task', 'Aufgabe in eine Kanban-Spalte verschieben: backlog, todo, doing oder done.', { id, status }, { ...write, idempotentHint: true }, ({ id, status }) => ({ task: store.update(id, { status }) }));
-  tool('delete_task', 'Eine Aufgabe dauerhaft löschen.', { id }, { ...write, destructiveHint: true, idempotentHint: true }, ({ id }) => store.delete(id));
+  tool('get_task', 'Read a task by ID.', { id }, readOnly, ({ id }) => ({ task: store.get(id) }));
+  tool('create_task', 'Create a task. Defaults: todo status and medium priority.', fields, write, (input) => ({ task: store.create(input) }));
+  tool('update_task', 'Update task fields. Fields not provided are preserved.', { id, ...fields, title: fields.title.optional() }, { ...write, idempotentHint: true }, ({ id, ...input }) => ({ task: store.update(id, input) }));
+  tool('move_task', 'Move a task to a Kanban column: backlog, todo, doing, or done.', { id, status }, { ...write, idempotentHint: true }, ({ id, status }) => ({ task: store.update(id, { status }) }));
+  tool('delete_task', 'Permanently delete a task.', { id }, { ...write, destructiveHint: true, idempotentHint: true }, ({ id }) => store.delete(id));
   return server;
 }
 
@@ -51,12 +51,12 @@ export async function handleMcp(req, res, store, access = createMcpAccess()) {
     const actual = Buffer.from(req.headers.authorization || '');
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
       res.setHeader('WWW-Authenticate', 'Bearer realm="KanDo MCP"');
-      return reject(401, 'MCP-Token erforderlich.');
+      return reject(401, 'MCP token required.');
     }
   }
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
-    return reject(405, 'Dieser zustandslose MCP-Endpunkt unterstützt POST.');
+    return reject(405, 'This stateless MCP endpoint supports POST.');
   }
   const server = createMcpServer(store);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });

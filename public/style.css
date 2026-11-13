@@ -55,6 +55,7 @@ a { color: inherit; text-decoration: none; }
 .brand-mark i { display: block; width: 4px; height: 13px; border-radius: 2px; background: var(--on-accent); }
 .brand-mark i:nth-child(2) { height: 9px; }
 .brand-mark i:nth-child(3) { height: 6px; }
+.header-controls { display: flex; align-items: center; gap: 22px; }
 .theme-control { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
 .theme-control select { padding: 7px 10px; background: var(--bg); border-color: transparent; font-size: 12px; }
 main { max-width: 1800px; margin: 0 auto; padding: 44px 36px; }
@@ -123,8 +124,9 @@ form textarea { resize: vertical; }
 @media (max-width: 600px) {
   .app-header { padding: 0 18px; height: 58px; }
   main { padding: 26px 18px; }
-  .theme-control { font-size: 0; }
-  .theme-control select { font-size: 12px; }
+  .header-controls { gap: 8px; }
+  .theme-control { font-size: 0; gap: 0; }
+  .theme-control select { font-size: 12px; max-width: 90px; }
   .board-tools { flex-wrap: wrap; gap: 8px; }
   .board-tools input { width: 100%; }
   .board { grid-template-columns: repeat(4, 270px); }

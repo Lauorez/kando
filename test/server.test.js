@@ -14,10 +14,16 @@ test('task lifecycle, validation, isolation and persistence', async () => {
     assert.deepEqual(await (await request()).json(), []);
     const page = await request('/');
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /Kanban-Board/);
+    const html = await page.text();
+    assert.match(html, /Kanban board/);
+    assert.match(html, /<html lang="en">/);
     assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
     assert.equal((await request('/style.css')).status, 200);
     assert.equal((await request('/app.js')).status, 200);
+    assert.equal((await request('/i18n.js')).status, 200);
+    const invalidTitle = await (await request('/api/tasks', 'POST', { title: '' })).json();
+    assert.equal(invalidTitle.code, 'TITLE_INVALID');
+    assert.match(invalidTitle.error, /title must contain/);
     assert.equal((await request('/api/tasks', 'POST', { title: 'Abgewiesen' }, { Origin: 'https://example.com' })).status, 403);
     for (const invalid of [{ title: '' }, { title: 'x', status: 'unknown' }, { title: 'x', priority: 'urgent' }, { title: 'x', dueDate: '2026-02-30' }, { title: 'x', description: 'x'.repeat(10001) }, null, []]) {
       assert.equal((await request('/api/tasks', 'POST', invalid)).status, 400);
