@@ -1,0 +1,21 @@
+services:
+  kando:
+    build: .
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
+      MCP_TOKEN: ${MCP_TOKEN:-}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
+    volumes:
+      - kando-data:/app/data
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/tasks').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  kando-data:

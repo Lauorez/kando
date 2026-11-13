@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141a18"><meta name="description" content="KanDo – dein selbst gehostetes Kanban-Board.">
+  <title>Mein Board · KanDo</title><link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/style.css"><script src="/theme.js"></script><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <a class="brand" href="/" aria-label="KanDo Startseite"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>KanDo</a>
+    <label class="theme-control">Darstellung<select id="theme" aria-label="Darstellung"><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>
+  </header>
+  <main>
+    <section class="page-heading"><div><h1>Mein Board</h1><p id="summary" aria-live="polite">Aufgaben werden geladen …</p></div><button class="primary" id="new-task">+ Neue Aufgabe</button></section>
+    <section class="board-tools" aria-label="Board-Werkzeuge">
+      <input id="search" type="search" placeholder="Aufgaben suchen …" aria-label="Aufgaben suchen">
+      <select id="priority-filter" aria-label="Nach Priorität filtern"><option value="all">Alle Prioritäten</option><option value="high">Hoch</option><option value="medium">Mittel</option><option value="low">Niedrig</option></select>
+      <button class="secondary" id="refresh">Aktualisieren</button>
+    </section>
+    <div id="error" class="error" role="alert" hidden></div>
+    <section class="board" id="board" aria-label="Kanban-Board" aria-busy="true"></section>
+    <footer class="board-footer"><span id="save-state" role="status">Board wird geladen …</span></footer>
+  </main>
+  <dialog id="task-dialog"><form id="task-form"><div class="dialog-heading"><div><h2 id="dialog-title">Neue Aufgabe</h2></div><button type="button" class="icon-button" id="close-dialog" aria-label="Schließen">×</button></div><label>Titel<input name="title" required maxlength="160" placeholder="Was möchtest du schaffen?"></label><label>Beschreibung <span class="optional">optional</span><textarea name="description" maxlength="10000" rows="4" placeholder="Details, Gedanken oder nächste Schritte …"></textarea></label><div class="form-grid"><label>Status<select name="status"><option value="backlog">Ideenspeicher</option><option value="todo">Zu erledigen</option><option value="doing">In Arbeit</option><option value="done">Erledigt</option></select></label><label>Priorität<select name="priority"><option value="low">Niedrig</option><option value="medium" selected>Mittel</option><option value="high">Hoch</option></select></label></div><label>Fällig am <span class="optional">optional</span><input name="dueDate" type="date" min="0001-01-01" max="9999-12-31"></label><p id="form-error" class="error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="danger" id="delete-task" hidden>Löschen</button><div><button type="button" class="secondary" id="cancel-dialog">Abbrechen</button><button type="submit" class="primary" id="save-task">Aufgabe erstellen</button></div></div></form></dialog>
+  <dialog id="delete-dialog"><div class="dialog-heading"><h2>Aufgabe löschen?</h2></div><p>Diese Aufgabe wird dauerhaft entfernt.</p><p id="delete-error" class="error" role="alert" hidden></p><div class="confirm-actions"><button class="secondary" id="cancel-delete">Behalten</button><button class="primary destructive" id="confirm-delete">Aufgabe löschen</button></div></dialog>
+</body>
+</html>
