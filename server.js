@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { createStore } from './store.js';
 import { handleMcp } from './mcp.js';
 import { createMcpAccess } from './mcp-access.js';
-import { localDay } from './public/dates.js';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const mcpAccess = createMcpAccess();
@@ -31,10 +30,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/mcp') return await handleMcp(req, res, store, mcpAccess);
     if (path.startsWith('/api/')) {
       if (!['GET', 'HEAD'].includes(req.method) && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return send(403, { error: 'Requests from another origin are not allowed.', code: 'ORIGIN_INVALID' });
-      if (path === '/api/tasks' && req.method === 'GET') {
-        res.setHeader('X-KanDo-Today', localDay());
-        return send(200, store.list());
-      }
+      if (path === '/api/tasks' && req.method === 'GET') return send(200, store.list());
       if (path === '/api/tasks' && req.method === 'POST') return send(201, store.create(await body(req)));
       const match = path.match(/^\/api\/tasks\/([a-f0-9-]+)$/);
       if (match && req.method === 'PATCH') return send(200, store.update(match[1], await body(req)));

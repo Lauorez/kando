@@ -4,7 +4,6 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      TZ: ${TZ:-Etc/UTC}
       MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
       MCP_TOKEN: ${MCP_TOKEN:-}
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}

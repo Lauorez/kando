@@ -12,7 +12,6 @@ test('task lifecycle, validation, isolation and persistence', async () => {
     server = await start(join(dir, 'tasks.sqlite'));
     const request = (path = '/api/tasks', method = 'GET', body, headers = {}) => fetch(server.url + path, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
     const initial = await request();
-    assert.match(initial.headers.get('X-KanDo-Today'), /^\d{4}-\d{2}-\d{2}$/);
     assert.deepEqual(await initial.json(), []);
     const page = await request('/');
     assert.equal(page.status, 200);

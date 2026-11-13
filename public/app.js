@@ -1,5 +1,5 @@
 import { createI18n, messages, translatePage } from './i18n.js';
-import { isDay, localDay, shiftDay } from './dates.js';
+import { localDay } from './dates.js';
 
 const $ = (selector) => document.querySelector(selector);
 let storage;
@@ -8,9 +8,6 @@ const i18n = createI18n(storage);
 const t = (key, values) => i18n.t(key, values);
 const priorities = ['high', 'medium', 'low'];
 let tasks = [];
-let today = localDay();
-let selectedDay = today;
-let view = 'daily';
 let editingId = null;
 let draggingId = null;
 let busy = false;
@@ -47,11 +44,6 @@ async function api(path = '', options = {}) {
   let data;
   try { data = await response.json(); } catch { throw uiError('errors.save'); }
   if (!response.ok) throw uiError(Object.hasOwn(messages.en, `errors.${data.code}`) ? `errors.${data.code}` : 'errors.save');
-  const serverDay = response.headers.get('X-KanDo-Today');
-  if (isDay(serverDay)) {
-    if (selectedDay === today) selectedDay = serverDay;
-    today = serverDay;
-  }
   return data;
 }
 function formatDay(day, options = { day: 'numeric', month: 'short' }) {
@@ -59,30 +51,23 @@ function formatDay(day, options = { day: 'numeric', month: 'short' }) {
 }
 function card(task) {
   const complete = task.status === 'done';
-  const overdue = task.dueDate && task.dueDate < today && !complete;
+  const overdue = task.dueDate && task.dueDate < localDay() && !complete;
   return `<article class="task-card ${complete ? 'is-done' : ''}" draggable="true" data-id="${task.id}" tabindex="0" aria-label="${escape(t('openTask', { title: task.title }))}">
     <div class="card-top"><span class="badge ${task.priority}">${t(task.priority)}</span><button class="edit-task" aria-label="${escape(t('editTask', { title: task.title }))}">···</button></div>
     <div class="task-heading"><input type="checkbox" class="complete-task" ${complete ? 'checked' : ''} ${busy ? 'disabled' : ''} aria-label="${escape(t(complete ? 'reopenTask' : 'completeTask', { title: task.title }))}"><h3 class="card-title">${escape(task.title)}</h3></div>
     ${task.description ? `<p class="card-description">${escape(task.description)}</p>` : ''}
-    ${view === 'all' ? `<p class="planned-day">${escape(t('taskDay', { day: formatDay(task.scheduledFor, { year: 'numeric', month: 'short', day: 'numeric' }) }))}</p>` : ''}
     <div class="card-bottom"><span class="due ${overdue ? 'overdue' : ''}" title="${task.dueDate || t('noDate')}">${task.dueDate ? `${t('dueDate')}: ${formatDay(task.dueDate)}` : ''}</span><select class="priority-select" aria-label="${escape(t('taskPriority', { title: task.title }))}" ${busy ? 'disabled' : ''}>${priorities.map((priority) => `<option value="${priority}" ${priority === task.priority ? 'selected' : ''}>${t(priority)}</option>`).join('')}</select></div>
   </article>`;
 }
 function render() {
   const query = $('#search').value.trim().toLocaleLowerCase(i18n.locale);
-  const dayTasks = tasks.filter((task) => view === 'all' || task.scheduledFor === selectedDay);
-  const visible = dayTasks.filter((task) => `${task.title} ${task.description}`.toLocaleLowerCase(i18n.locale).includes(query) && ($('#show-completed').checked || task.status !== 'done'));
-  const done = dayTasks.filter((task) => task.status === 'done').length;
-  $('#summary').textContent = loaded ? t(dayTasks.length === 1 ? 'summaryOne' : 'summary', { count: dayTasks.length, done }) : t('loading');
-  $('#board-title').textContent = t(view === 'all' ? 'allTasks' : selectedDay === today ? 'today' : 'dailyBoard');
-  $('#board-date').textContent = view === 'all' ? '' : formatDay(selectedDay, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  document.title = `${$('#board-title').textContent} · KanDo`;
-  $('#selected-day').value = selectedDay;
-  $('#day-navigation').hidden = view === 'all';
-  $('#daily-view').setAttribute('aria-pressed', String(view === 'daily'));
-  $('#all-view').setAttribute('aria-pressed', String(view === 'all'));
-  $('#daily-progress').max = dayTasks.length || 1;
-  $('#daily-progress').value = done;
+  const visible = tasks.filter((task) => `${task.title} ${task.description}`.toLocaleLowerCase(i18n.locale).includes(query) && ($('#show-completed').checked || task.status !== 'done'));
+  const done = tasks.filter((task) => task.status === 'done').length;
+  $('#summary').textContent = loaded ? t(tasks.length === 1 ? 'summaryOne' : 'summary', { count: tasks.length, done }) : t('loading');
+  $('#board-title').textContent = t('boardTitle');
+  document.title = t('pageTitle');
+  $('#board-progress').max = tasks.length || 1;
+  $('#board-progress').value = done;
   $('#board').innerHTML = priorities.map((priority) => {
     const items = visible.filter((task) => task.priority === priority).sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
     return `<section class="column" data-priority="${priority}" aria-label="${t(priority)}"><div class="column-heading"><h2>${t(priority)}</h2><span class="column-count">${items.length}</span><button class="icon-button add-task" aria-label="${escape(t('addIn', { column: t(priority) }))}">+</button></div><div class="cards">${items.length ? items.map(card).join('') : `<div class="empty-column">${!loaded ? t('loading') : query ? t('noMatches') : t('empty')}</div>`}</div><button class="add-card add-task">${t('addTask')}</button></section>`;
@@ -95,7 +80,7 @@ function openTask(id = null, priority = 'medium') {
   const task = tasks.find((task) => task.id === id);
   form.reset();
   error('', $('#form-error'));
-  const defaults = { status: 'todo', priority, scheduledFor: view === 'all' || selectedDay < today ? today : selectedDay };
+  const defaults = { status: 'todo', priority };
   for (const [name, value] of Object.entries(task || defaults)) if (form.elements.namedItem(name)) form.elements.namedItem(name).value = value;
   dialogLabels();
   form.elements.title.setCustomValidity('');
@@ -122,24 +107,12 @@ async function updateTask(id, patch) {
   } catch (e) { error(e); localized($('#save-state'), 'notSaved'); }
   finally { lock(false); render(); }
 }
-function selectDay(day) {
-  if (!isDay(day)) { $('#selected-day').value = selectedDay; return; }
-  selectedDay = day;
-  view = 'daily';
-  render();
-}
 $('#language').addEventListener('change', (event) => { i18n.setLanguage(event.target.value); applyLanguage(); });
 form.elements.title.addEventListener('invalid', () => form.elements.title.setCustomValidity(t('errors.TITLE_INVALID')));
 form.elements.title.addEventListener('input', () => form.elements.title.setCustomValidity(''));
 $('#new-task').addEventListener('click', () => openTask());
 $('#search').addEventListener('input', render);
 $('#show-completed').addEventListener('change', render);
-$('#selected-day').addEventListener('change', (event) => selectDay(event.target.value));
-$('#previous-day').addEventListener('click', () => selectDay(shiftDay(selectedDay, -1)));
-$('#next-day').addEventListener('click', () => selectDay(shiftDay(selectedDay, 1)));
-$('#today').addEventListener('click', () => selectDay(today));
-$('#daily-view').addEventListener('click', () => { view = 'daily'; render(); });
-$('#all-view').addEventListener('click', () => { view = 'all'; render(); });
 for (const id of ['close-dialog', 'cancel-dialog']) $(`#${id}`).addEventListener('click', () => dialog.close());
 for (const modal of [dialog, $('#delete-dialog')]) modal.addEventListener('cancel', (event) => { if (busy) event.preventDefault(); });
 $('#board').addEventListener('click', (event) => {
@@ -195,7 +168,6 @@ form.addEventListener('submit', async (event) => {
   try {
     const task = await api(editingId ? `/${editingId}` : '', { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify(input) });
     tasks = editingId ? tasks.map((existing) => existing.id === editingId ? task : existing) : [task, ...tasks];
-    if (view === 'daily') selectedDay = task.scheduledFor;
     loaded = true;
     error('');
     localized($('#save-state'), 'saved');

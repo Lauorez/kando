@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { createI18n, messages, translatePage } from '../public/i18n.js';
-import { localDay } from '../public/dates.js';
 
 function storage(initial) {
   const values = new Map(initial ? [['kando-language', initial]] : []);
@@ -42,13 +41,13 @@ test('static UI translations include labels and metadata without changing form v
   }
   i18n.setLanguage('de'); translatePage(doc, i18n);
   assert.equal(doc.documentElement.lang, 'de');
-  assert.equal(doc.title, 'Tagesaufgaben · KanDo');
+  assert.equal(doc.title, 'Meine Aufgaben · KanDo');
   assert.equal(doc.querySelector('#search').placeholder, 'Aufgaben suchen …');
   assert.equal(doc.querySelector('#close-dialog').getAttribute('aria-label'), 'Schließen');
   assert.equal(title.value, 'Meine unveränderte Aufgabe');
   assert.equal(doc.querySelector('[name="status"]').value, 'doing');
   i18n.setLanguage('en'); translatePage(doc, i18n);
-  assert.equal(doc.title, 'Daily tasks · KanDo');
+  assert.equal(doc.title, 'My tasks · KanDo');
   assert.equal(title.value, 'Meine unveränderte Aufgabe');
   dom.window.close();
 });
@@ -61,7 +60,7 @@ test('live language switching preserves tasks, search, drafts, and localized ser
   Object.defineProperty(window.navigator, 'language', { value: 'de-DE' });
   window.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   window.HTMLDialogElement.prototype.close = function () { this.open = false; };
-  const task = { id: '62f829ab-c457-4798-a402-cfc064d63354', title: 'Meine Aufgabe <script>', description: 'Unverändert', status: 'todo', priority: 'high', dueDate: '2026-03-10', scheduledFor: localDay() };
+  const task = { id: '62f829ab-c457-4798-a402-cfc064d63354', title: 'Meine Aufgabe <script>', description: 'Unverändert', status: 'todo', priority: 'high', dueDate: '2026-03-10' };
   const change = (element, type = 'change') => element.dispatchEvent(new window.Event(type, { bubbles: true }));
   globalThis.window = window;
   globalThis.document = doc;

@@ -8,7 +8,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { start } from '../test-support/server.js';
-import { localDay, shiftDay } from '../public/dates.js';
 
 test('HTTP and stdio MCP share tasks with the app, enforce validation and protect HTTP access', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'kando-mcp-'));
@@ -38,20 +37,17 @@ test('HTTP and stdio MCP share tasks with the app, enforce validation and protec
     const created = await call('create_task', { title: 'MCP testen', description: 'Gemeinsame Daten', priority: 'high' });
     assert.ok(!created.isError);
     const task = created.structuredContent.task;
-    assert.equal(task.scheduledFor, localDay());
+    assert.equal(Object.hasOwn(task, 'scheduledFor'), false);
+    assert.equal(Object.hasOwn(tools.find((tool) => tool.name === 'list_tasks').inputSchema.properties, 'day'), false);
+    assert.equal(Object.hasOwn(tools.find((tool) => tool.name === 'create_task').inputSchema.properties, 'scheduledFor'), false);
     const apiTasks = await (await fetch(`${server.url}/api/tasks`)).json();
     assert.equal(apiTasks[0].id, task.id);
     assert.equal((await call('list_tasks', { query: 'gemeinsame', priority: 'high' })).structuredContent.tasks.length, 1);
     assert.equal((await call('list_tasks', { status: 'done' })).structuredContent.tasks.length, 0);
-    assert.equal((await call('list_tasks', { day: 'today' })).structuredContent.tasks.length, 1);
-    const nextDay = shiftDay(localDay(), 2);
-    const planned = await call('move_task', { id: task.id, scheduledFor: nextDay, priority: 'low' });
-    assert.equal(planned.structuredContent.task.priority, 'low');
-    assert.equal((await call('list_tasks', { day: 'today' })).structuredContent.tasks.length, 0);
-    assert.equal((await call('list_tasks', { day: nextDay, priority: 'low' })).structuredContent.tasks.length, 1);
+    const moved = await call('move_task', { id: task.id, priority: 'low' });
+    assert.equal(moved.structuredContent.task.priority, 'low');
+    assert.equal((await call('list_tasks', { priority: 'low' })).structuredContent.tasks.length, 1);
     assert.equal((await call('move_task', { id: task.id })).isError, true);
-    assert.equal((await call('create_task', { title: 'Invalid day', scheduledFor: '2026-02-30' })).isError, true);
-    await call('move_task', { id: task.id, scheduledFor: localDay() });
     assert.equal((await call('move_task', { id: task.id, status: 'doing' })).structuredContent.task.status, 'doing');
     assert.equal((await call('update_task', { id: task.id, title: 'Geändert', dueDate: '2026-12-01' })).structuredContent.task.title, 'Geändert');
     await stdioClient.connect(new StdioClientTransport({ command: process.execPath, args: [resolve('mcp-stdio.js')], cwd: tmpdir(), env: { ...process.env, DATABASE_PATH: database }, stderr: 'pipe' }));
